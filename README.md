@@ -28,8 +28,8 @@
 | 数据在哪 | 手机里 | 浏览器里 | 你的电脑上 |
 | 适合 | 安卓用户日常用 | 任何手机随手用 | 想多端同步/长期归档 |
 
-> 安卓 App 的 APK 在 [Actions](https://github.com/zyz674/moneybook/actions/workflows/android.yml) 里下载
-> （最新一次 Build APK → Artifacts → moneybook-apk），细节见 `android/README.md`。
+> **安卓 App 下载：[moneybook.apk](https://github.com/zyz674/moneybook/releases/latest/download/moneybook.apk)**
+> （2 MB，装上开启通知权限即可用；细节见 `android/README.md`）。
 > **iPhone 做不到自动读通知**（iOS 系统限制），用纯前端版或服务端版，见 `docs/iPhone使用指南.md`。
 
 - 纯 Python 标准库实现，**零第三方依赖**，电脑 / 手机 Termux / 服务器都能跑

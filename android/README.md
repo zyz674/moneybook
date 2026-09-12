@@ -16,9 +16,13 @@
 
 ### 方式一：直接下载（推荐，不用装开发工具）
 
-1. 打开仓库的 [Actions](https://github.com/zyz674/moneybook/actions/workflows/android.yml) 页面
-2. 点最新一次成功的 **Build APK** → 页面底部 **Artifacts** → 下载 `moneybook-apk`
-3. 解压得到 `moneybook.apk`，传到手机上安装（首次会提示「允许安装未知应用」，同意即可）
+**下载地址：[moneybook.apk](https://github.com/zyz674/moneybook/releases/latest/download/moneybook.apk)**
+
+手机上打开这个链接就能下（不用登录 GitHub），安装时如果提示「禁止安装未知应用」，
+按提示允许一次即可。也可以从 [Releases](https://github.com/zyz674/moneybook/releases) 页面下载。
+
+> 想自己编译同样的包，可以在 [Actions](https://github.com/zyz674/moneybook/actions/workflows/android.yml)
+> 里看构建记录（那里也能下 Artifacts，但需要登录 GitHub）。
 
 > 这个 APK 用的是调试签名，够自己人和朋友用；要上架应用商店才需要另外配正式签名。
 
