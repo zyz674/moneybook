@@ -85,7 +85,7 @@ class MainActivity : Activity() {
     /** 处理「分享到记账本」和「用记账本打开账单文件」 */
     private fun handleIntent(intent: Intent?) {
         val action = intent?.action ?: return
-        val uri: Uri? = when (action) {
+        val raw: Uri? = when (action) {
             Intent.ACTION_SEND -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
@@ -96,7 +96,8 @@ class MainActivity : Activity() {
             }
             Intent.ACTION_VIEW -> intent.data
             else -> null
-        } ?: return
+        }
+        val uri: Uri = raw ?: return
         if (web == null || web?.url == null) {
             pendingImportUri = uri
         } else {
