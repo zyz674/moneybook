@@ -1,0 +1,9 @@
+# 统一换行符：文本用 LF，Windows 脚本用 CRLF，二进制不转换
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary
+*.db binary
+*.zip binary

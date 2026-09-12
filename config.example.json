@@ -1,0 +1,26 @@
+{
+  "host": "0.0.0.0",
+  "port": 8787,
+  "access_token": "换成你自己的口令",
+  "sync": {
+    "interval_hours": 3,
+    "on_start": true,
+    "watch_inbox": true,
+    "pull_urls": []
+  },
+  "reports": {
+    "daily_times": ["12:00"],
+    "daily_mode": "since_last",
+    "push_daily": true,
+    "weekly": { "enabled": true, "weekday": 1, "time": "09:00" },
+    "monthly": { "enabled": true, "day": 1, "time": "09:00" }
+  },
+  "budget": { "monthly": 3000, "categories": { "餐饮": 1000, "购物": 800 } },
+  "alerts": { "large_amount": 200, "budget_percent": 80 },
+  "notify": {
+    "channels": [
+      { "type": "bark", "url": "https://api.day.app/你的KEY", "group": "记账本", "enabled": true }
+    ]
+  },
+  "categorize": { "auto": true, "learn_from_manual": true }
+}

@@ -1,0 +1,329 @@
+/* 记账本 · 电子账页
+   设计：一整张账页（红边纸 + 格线 + 账目行），宋体做账目标题，窄体数字做金额，
+   朱砂只用来表示「支出／印章」，青瓷表示「收入」。 */
+
+:root {
+  --paper: #fcfbf6;
+  --paper-2: #f5f3ea;
+  --ink: #1d2a35;
+  --ink-2: #5a6673;
+  --ink-3: #6b747d;          /* 11.5px 小字也要 ≥4.5:1 对比度 */
+  --rule: #e4dfd4;
+  --rule-2: #cfc8b9;
+  --edge: rgba(176, 58, 46, .3);   /* 红边线 */
+  --cinnabar: #b03a2e;             /* 朱砂：支出、印章 */
+  --celadon: #2f6b5e;              /* 青瓷：收入 */
+  --amber: #8a6410;                /* 提醒 */
+  --serif: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif;
+  --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+  --fig: "DIN Alternate", "Bahnschrift", "Roboto Condensed", "Helvetica Neue", Arial, sans-serif;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #151a1e; --paper-2: #1c2227; --ink: #eae6dc; --ink-2: #9aa3aa; --ink-3: #8a939b;
+    --rule: #2a3238; --rule-2: #3a444c; --edge: rgba(217, 104, 90, .34);
+    --cinnabar: #d9685a; --celadon: #6fbf9e; --amber: #d3a24a;
+  }
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.6 var(--sans);
+  padding-bottom: calc(58px + var(--safe-b));
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p, dl, dd, dt, figure { margin: 0; }
+button, input, select, textarea { font-family: inherit; font-size: 15px; color: inherit; }
+button { cursor: pointer; }
+.hidden { display: none !important; }
+:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 2px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 1px; }
+.num { font-family: var(--fig); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.in { color: var(--celadon); }
+.out { color: var(--cinnabar); }
+.muted { color: var(--ink-2); }
+.mini { font-size: 12.5px; color: var(--ink-2); line-height: 1.55; }
+.center { text-align: center; }
+.nowrap { white-space: nowrap; }
+
+/* ---------- 页眉 ---------- */
+#topbar {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule-2);
+  padding: calc(10px + var(--safe-t)) 18px 9px 30px;
+  display: flex; align-items: baseline; gap: 12px;
+}
+#topTitle { font-family: var(--serif); font-size: 21px; font-weight: 600; letter-spacing: .02em; }
+#topSub { font-size: 12.5px; color: var(--ink-2); margin-left: auto; text-align: right; }
+.act {
+  border: 0; background: none; color: var(--ink-2); font-size: 13px;
+  padding: 4px 0 4px 10px; text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-color: var(--rule-2);
+}
+.act:active { color: var(--ink); }
+
+/* ---------- 账页 ---------- */
+main {
+  max-width: 680px; margin: 0 auto;
+  padding: 0 18px 26px 30px;
+  position: relative;
+}
+main::before {                       /* 红边纸的竖线 */
+  content: ""; position: absolute; left: 16px; top: 0; bottom: 0;
+  width: 2px; background: var(--edge);
+}
+.view { display: none; }
+.view.active { display: block; animation: sheet-in .22s ease-out; }
+@keyframes sheet-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .view.active { animation: none; }
+  * { transition: none !important; }
+}
+
+/* ---------- 账目标题（栏头） ---------- */
+.sec {
+  font-family: var(--serif); font-size: 13px; font-weight: 600; color: var(--ink-2);
+  letter-spacing: .14em;
+  padding: 22px 0 7px;
+}
+.sec-row { display: flex; align-items: baseline; gap: 10px; padding: 22px 0 7px; }
+.sec-row .sec { padding: 0; margin-right: auto; }
+
+/* ---------- 首页：合计行 ---------- */
+.hero { padding-top: 18px; }
+.hero .caption {
+  font-family: var(--serif); font-size: 13.5px; color: var(--ink-2); letter-spacing: .1em;
+  border-bottom: 1px solid var(--rule-2); padding-bottom: 6px; display: flex; justify-content: space-between;
+}
+.hero .total {
+  font-family: var(--fig); font-size: 44px; font-weight: 500; line-height: 1.08;
+  letter-spacing: -.02em; padding: 14px 0 2px; color: var(--cinnabar);
+  font-variant-numeric: tabular-nums;
+}
+.hero .total .cur { font-size: 22px; font-weight: 400; margin-right: 4px; vertical-align: 8px; }
+.hero .total .dec { font-size: 26px; font-weight: 400; }
+.hero .sub { font-size: 12.5px; color: var(--ink-2); }
+
+.spark { display: block; width: 100%; height: 58px; margin: 12px 0 2px; }
+
+/* 三栏账目 */
+.ledger {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+  padding: 10px 0 11px; margin-top: 10px;
+}
+.ledger > div { padding-right: 10px; }
+.ledger > div + div { border-left: 1px solid var(--rule); padding-left: 12px; }
+.ledger dt { font-size: 12px; color: var(--ink-2); margin-bottom: 3px; }
+.ledger dd { font-family: var(--fig); font-size: 19px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.ledger small { font-size: 11.5px; color: var(--ink-3); }
+
+/* 预算：账目行，不是进度条卡片 */
+.budget-line { display: flex; align-items: baseline; gap: 8px; padding: 11px 0; border-bottom: 1px solid var(--rule); font-size: 13px; }
+.budget-line .bar { flex: 1; height: 3px; background: var(--rule); position: relative; margin: 0 4px 3px; }
+.budget-line .bar > i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink-2); }
+.budget-line.warn .bar > i { background: var(--amber); }
+.budget-line.over .bar > i { background: var(--cinnabar); }
+.budget-line .val { font-family: var(--fig); font-variant-numeric: tabular-nums; }
+
+/* ---------- 流水行 ---------- */
+.dayrule {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 12px; color: var(--ink-2);
+  border-top: 1px solid var(--rule-2); margin-top: 14px; padding: 6px 0 5px;
+}
+.dayrule .d { font-family: var(--serif); letter-spacing: .06em; }
+.dayrule .sum { font-family: var(--fig); font-variant-numeric: tabular-nums; }
+
+.rows { list-style: none; margin: 0; padding: 0; }
+.row {
+  display: grid; grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  align-items: center; gap: 10px;
+  min-height: 50px; padding: 7px 0;
+  border-bottom: 1px solid var(--rule);
+  text-align: left; width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0;
+  font: inherit; color: inherit;
+}
+.row:active { background: var(--paper-2); }
+.row .when { text-align: right; line-height: 1.15; }
+.row .when b { display: block; font-family: var(--fig); font-size: 16px; font-weight: 500; }
+.row .when i { font-style: normal; font-size: 10.5px; color: var(--ink-3); }
+.row .who { min-width: 0; }
+.row .who b { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .who span { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.row .amt { font-family: var(--fig); font-size: 16.5px; font-variant-numeric: tabular-nums; text-align: right; }
+.row .amt.in::before { content: "+"; }
+.row .amt.out::before { content: "−"; }
+.row .amt.flat { color: var(--ink-3); }
+
+/* 印章式分类标记 */
+.seal {
+  font-family: var(--serif); font-size: 11px; line-height: 1.25;
+  color: var(--cinnabar); border: 1px solid currentColor; border-radius: 2px;
+  padding: 2px 4px; text-align: center; letter-spacing: .04em;
+  max-width: 4.6em; overflow: hidden; white-space: nowrap;
+}
+.seal.celadon { color: var(--celadon); }
+.seal.flat { color: var(--ink-3); }
+
+.empty { padding: 26px 0 30px; color: var(--ink-2); font-size: 13.5px; line-height: 1.7; }
+.empty b { font-weight: 600; color: var(--ink); }
+.empty code { font-family: var(--fig); background: var(--paper-2); border: 1px solid var(--rule); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; }
+
+/* ---------- 筛选 ---------- */
+.filters { padding-top: 14px; }
+.filters .line { display: flex; gap: 10px; align-items: center; padding-bottom: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 0; border-top: 1px solid var(--rule); }
+.chip {
+  border: 0; background: none; padding: 9px 11px 8px; font-size: 13px; color: var(--ink-2);
+  border-bottom: 2px solid transparent;
+}
+.chip.on { color: var(--ink); border-bottom-color: var(--cinnabar); font-weight: 600; }
+.chip.plain { border-bottom-color: transparent; }
+
+/* ---------- 表单 ---------- */
+input[type=text], input[type=number], input[type=password], input[type=date], input[type=month],
+input[type=time], input[type=datetime-local], select, textarea {
+  width: 100%; padding: 10px 11px; border: 1px solid var(--rule-2); border-radius: 6px;
+  background: var(--paper); color: var(--ink); outline: none;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--ink-2); }
+textarea { min-height: 96px; resize: vertical; font-family: var(--fig); font-size: 13px; line-height: 1.5; }
+label.field { display: block; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+label.field > span { display: block; font-size: 12.5px; color: var(--ink-2); margin-bottom: 6px; }
+label.field > span em { font-style: normal; color: var(--ink-3); }
+
+.btn {
+  border: 1px solid var(--ink); background: var(--ink); color: var(--paper);
+  border-radius: 6px; padding: 11px 15px; font-size: 14.5px; font-weight: 500; width: 100%;
+}
+.btn:active { opacity: .85; }
+.btn.ghost { background: none; color: var(--ink); border-color: var(--rule-2); }
+.btn.danger { background: none; color: var(--cinnabar); border-color: var(--cinnabar); }
+.btn.sm { width: auto; padding: 8px 12px; font-size: 13px; }
+.btn[disabled] { opacity: .45; }
+.btn-row { display: flex; gap: 9px; padding-top: 16px; }
+
+/* ---------- 底部页签 ---------- */
+#tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  display: flex; background: var(--paper); border-top: 1px solid var(--rule-2);
+  padding-bottom: var(--safe-b);
+}
+#tabbar button {
+  flex: 1; border: 0; background: none; color: var(--ink-3); font-size: 13.5px;
+  padding: 15px 0 14px; border-top: 2px solid transparent; margin-top: -1px;
+  font-family: var(--serif); letter-spacing: .06em;
+}
+#tabbar button.on { color: var(--ink); border-top-color: var(--cinnabar); font-weight: 600; }
+
+#fab {
+  position: fixed; right: 18px; bottom: calc(70px + var(--safe-b)); z-index: 31;
+  width: 52px; height: 52px; border-radius: 8px; border: 0;
+  background: var(--ink); color: var(--paper); font-size: 24px; line-height: 1;
+}
+#fab:active { opacity: .85; }
+
+/* 图表 */
+.chart { display: block; width: 100%; height: 160px; }
+.axis { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-3); padding-top: 4px; }
+.legend { display: flex; gap: 16px; font-size: 12px; color: var(--ink-2); padding-top: 8px; }
+.legend i { display: inline-block; width: 8px; height: 8px; margin-right: 5px; }
+
+/* 分类账目：用「格线长度」当条形，不用胶囊进度条 */
+.rank { padding: 9px 0 10px; border-bottom: 1px solid var(--rule); }
+.rank .top { display: flex; align-items: baseline; gap: 9px; }
+.rank .top .nm { flex: 1; min-width: 0; font-size: 14px; }
+.rank .top .vl { font-family: var(--fig); font-variant-numeric: tabular-nums; font-size: 14.5px; }
+.rank .top .pc { font-size: 11.5px; color: var(--ink-3); width: 3.4em; text-align: right; }
+.rank .rule { height: 2px; background: var(--rule); margin-top: 7px; position: relative; }
+.rank .rule > i { position: absolute; left: 0; top: 0; bottom: 0; }
+
+/* 规则条目 */
+.rule { display: flex; gap: 10px; align-items: flex-start; padding: 11px 0; border-bottom: 1px solid var(--rule); }
+.rule .body { flex: 1; min-width: 0; }
+.rule .cond { font-size: 13.5px; line-height: 1.5; }
+.rule .res { font-size: 12px; color: var(--ink-2); padding-top: 3px; }
+.rule .hits { font-size: 11.5px; color: var(--ink-3); font-family: var(--fig); white-space: nowrap; padding-top: 2px; }
+.rule .del { border: 0; background: none; color: var(--ink-3); font-size: 12px; padding: 2px 0 2px 6px; }
+
+.tag {
+  display: inline-block; border: 1px solid var(--rule-2); border-radius: 2px;
+  padding: 0 5px; font-size: 11px; color: var(--ink-2); margin-right: 4px;
+}
+.quote {
+  background: var(--paper-2); border-left: 2px solid var(--rule-2);
+  padding: 9px 11px; font-size: 12.5px; line-height: 1.6; color: var(--ink-2);
+  margin: 10px 0; word-break: break-all;
+}
+.sub-item { display: flex; align-items: baseline; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--rule); font-size: 13.5px; }
+.sub-item .nm { flex: 1; min-width: 0; }
+.sub-item .nm small { display: block; color: var(--ink-3); font-size: 11.5px; }
+.sub-item .amt { font-family: var(--fig); font-variant-numeric: tabular-nums; }
+
+/* 日志 */
+.log-item { padding: 9px 0; border-bottom: 1px solid var(--rule); font-size: 12.5px; color: var(--ink-2); }
+.log-item b { color: var(--ink); font-weight: 500; }
+.log-item .t { font-family: var(--fig); }
+
+/* ---------- 底部弹层 ---------- */
+#mask { position: fixed; inset: 0; background: rgba(20, 26, 30, .42); z-index: 40; opacity: 0; transition: opacity .2s; }
+#mask.show { opacity: 1; }
+#sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; background: var(--paper);
+  border-top: 1px solid var(--rule-2); border-radius: 14px 14px 0 0;
+  padding: 10px 20px calc(18px + var(--safe-b));
+  max-height: 90vh; overflow-y: auto;
+  transform: translateY(101%); transition: transform .26s cubic-bezier(.32, .72, 0, 1);
+}
+#sheet.show { transform: none; }
+#sheet .handle { width: 34px; height: 3px; background: var(--rule-2); margin: 4px auto 12px; }
+#sheet h3 { font-family: var(--serif); font-size: 17px; font-weight: 600; padding-bottom: 6px; }
+.sheet-note { font-size: 12px; color: var(--ink-2); padding: 4px 0 10px; border-bottom: 1px solid var(--rule); }
+
+/* 印章式选择器（分类） */
+.pick { display: flex; flex-wrap: wrap; gap: 7px; }
+.pick button {
+  border: 1px solid var(--rule-2); background: none; border-radius: 3px; padding: 6px 9px;
+  font-family: var(--serif); font-size: 12.5px; color: var(--ink-2);
+}
+.pick button.on { border-color: var(--cinnabar); color: var(--cinnabar); font-weight: 600; }
+
+/* 金额输入 */
+.amount-field { padding: 14px 0 10px; border-bottom: 1px solid var(--rule); }
+.amount-field .cap { font-size: 12.5px; color: var(--ink-2); }
+.amount-field input {
+  border: 0; background: none; padding: 4px 0; font-family: var(--fig); font-size: 40px;
+  font-variant-numeric: tabular-nums; letter-spacing: -.02em; width: 100%;
+}
+.amount-field input:focus { border: 0; }
+.dir-pick { display: flex; gap: 0; border-bottom: 1px solid var(--rule); }
+.dir-pick .chip { flex: 1; text-align: center; }
+
+/* 提示 */
+#toast {
+  position: fixed; left: 50%; bottom: calc(88px + var(--safe-b)); transform: translateX(-50%) translateY(16px);
+  background: var(--ink); color: var(--paper); padding: 9px 16px; border-radius: 6px;
+  font-size: 13px; z-index: 60; opacity: 0; transition: opacity .2s, transform .2s;
+  pointer-events: none; max-width: 88vw; text-align: center;
+}
+#toast.show { opacity: 1; transform: translateX(-50%); }
+
+pre.text-out {
+  background: var(--paper-2); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 12px 13px; font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; margin: 0;
+}
+
+@media (min-width: 560px) {
+  main { padding-left: 38px; }
+  main::before { left: 20px; }
+  .hero .total { font-size: 52px; }
+}

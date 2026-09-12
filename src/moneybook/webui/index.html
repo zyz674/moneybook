@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fcfbf6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151a1e" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="记账本">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>记账本</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header id="topbar">
+  <h1 id="topTitle">记账本</h1>
+  <span id="topSub" class="mini hidden"></span>
+  <button class="act" id="btnSync">同步流水</button>
+</header>
+
+<main>
+  <!-- 总账 -->
+  <section class="view active" id="view-home">
+    <div class="hero">
+      <p class="caption"><span id="homeCaption">本月合计支出</span><span id="homeCaptionNote"></span></p>
+      <p class="total num" id="homeTotal">¥0.00</p>
+      <p class="sub" id="homeSub"></p>
+      <svg class="spark" id="homeSpark" viewBox="0 0 300 58" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <dl class="ledger">
+        <div><dt>支出</dt><dd class="out num" id="homeOut">0.00</dd><small id="homeOutCnt">0 笔</small></div>
+        <div><dt>收入</dt><dd class="in num" id="homeIn">0.00</dd><small id="homeInCnt">0 笔</small></div>
+        <div><dt>结余</dt><dd class="num" id="homeNet">0.00</dd><small id="homeNetNote">本月</small></div>
+      </dl>
+      <div class="budget-line" id="budgetLine">
+        <span id="budgetLabel">预算</span>
+        <span class="bar"><i id="budgetBar" style="width:0%"></i></span>
+        <span class="val" id="budgetText">未设置</span>
+      </div>
+      <p class="mini" id="syncLine" style="padding-top:9px">正在读取同步状态…</p>
+    </div>
+
+    <div id="uncatLine" class="hidden">
+      <div class="sec-row"><h2 class="sec">待确认分类</h2><button class="act" id="btnUncat">去处理</button></div>
+      <p class="mini" id="uncatText"></p>
+    </div>
+
+    <div id="pendingLine" class="hidden">
+      <div class="sec-row"><h2 class="sec">待录入</h2><button class="act" id="btnPending">去补录</button></div>
+      <p class="mini" id="pendingText"></p>
+    </div>
+
+    <div class="sec-row"><h2 class="sec">流水</h2><button class="act" id="btnAllTx">看全部</button></div>
+    <div id="homeTxList"></div>
+
+    <div class="sec-row"><h2 class="sec">账单</h2>
+      <button class="act" id="btnPreview">生成</button>
+      <button class="act" id="btnPush">推送</button>
+    </div>
+    <pre class="text-out" id="previewText">点「生成」，这里会显示当前区间的账单文本。</pre>
+  </section>
+
+  <!-- 流水 -->
+  <section class="view" id="view-list">
+    <div class="filters">
+      <div class="line">
+        <input type="month" id="listMonth">
+        <button class="btn ghost sm nowrap" id="btnThisMonth">本月</button>
+      </div>
+      <div class="chips" id="listChips">
+        <button class="chip on" data-dir="">全部</button>
+        <button class="chip" data-dir="out">支出</button>
+        <button class="chip" data-dir="in">收入</button>
+        <button class="chip" data-dir="neutral">不计收支</button>
+        <button class="chip" data-un="1">未分类</button>
+        <button class="chip" data-src="wechat">微信</button>
+        <button class="chip" data-src="alipay">支付宝</button>
+        <button class="chip" data-src="bank">银行</button>
+      </div>
+      <div class="line" style="padding-top:12px">
+        <input type="text" id="listSearch" placeholder="搜商户、说明、分类">
+      </div>
+    </div>
+    <p class="mini" id="listSummary" style="padding-top:6px"></p>
+    <div id="listTx"></div>
+  </section>
+
+  <!-- 统计 -->
+  <section class="view" id="view-stats">
+    <div class="filters">
+      <div class="line">
+        <input type="month" id="statsMonth">
+        <button class="btn ghost sm nowrap" id="btnStatsRefresh">刷新</button>
+      </div>
+    </div>
+    <div class="sec-row"><h2 class="sec">每日支出与累计</h2></div>
+    <svg class="chart" id="statsChart" viewBox="0 0 300 160" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <div class="axis" id="statsAxis"></div>
+    <div class="legend">
+      <span><i style="background:var(--cinnabar)"></i>每日支出</span>
+      <span><i style="background:var(--ink)"></i>累计支出</span>
+    </div>
+
+    <div class="sec-row"><h2 class="sec">支出分类</h2><span class="mini" id="statsCaption"></span></div>
+    <div id="statsCats"></div>
+
+    <div class="sec-row"><h2 class="sec">收入构成</h2></div>
+    <div id="statsIncome"></div>
+
+    <div class="sec-row"><h2 class="sec">支付方式</h2></div>
+    <div id="statsMethods"></div>
+
+    <div class="sec-row"><h2 class="sec">固定支出</h2><span class="mini" id="subsCaption"></span></div>
+    <div id="statsSubs"></div>
+
+    <div class="sec-row"><h2 class="sec">常去的商户</h2></div>
+    <div id="statsMerchants"></div>
+  </section>
+
+  <!-- 设置 -->
+  <section class="view" id="view-me">
+    <div class="sec-row"><h2 class="sec">导入账单</h2></div>
+    <p class="mini">支付宝、微信导出的 CSV 或 zip 都行，编码交给服务器识别。文件只在你的设备和这台服务器之间传输。</p>
+    <label class="field"><span>选择账单文件</span><input type="file" id="fileInput" accept=".csv,.txt,.zip"></label>
+    <p class="mini" id="importResult"></p>
+
+    <div class="sec-row"><h2 class="sec">自动同步与账单</h2></div>
+    <label class="field"><span>账单投递目录<em>（把导出的账单复制进来就会自动导入）</em></span>
+      <input type="text" id="setInbox" readonly></label>
+    <label class="field"><span>流水同步间隔（小时）</span><input type="number" id="setInterval" step="0.5" min="0.5"></label>
+    <label class="field"><span>每日账单时间<em>（24 小时制，可填多个，用逗号隔开）</em></span>
+      <input type="text" id="setDailyTimes" placeholder="00:00,12:00"></label>
+    <label class="field"><span>每日账单统计口径</span>
+      <select id="setDailyMode">
+        <option value="auto">自动：凌晨那次出昨日全天，其余时段出距上次以来的流水</option>
+        <option value="since_last">距上次推送以来的流水</option>
+        <option value="today">当天 0 点到现在</option>
+        <option value="yesterday">昨天一整天</option>
+      </select></label>
+    <label class="field"><span>每月预算（元，0 表示不设）</span><input type="number" id="setBudget" step="1" min="0"></label>
+    <label class="field"><span>大额支出提醒（元，0 表示关闭）</span><input type="number" id="setLarge" step="1" min="0"></label>
+    <div class="btn-row"><button class="btn" id="btnSaveSettings">保存设置</button></div>
+
+    <div class="sec-row"><h2 class="sec">推送通道</h2></div>
+    <p class="mini">填一个 JSON 数组。只推微信就填 Server 酱的 SendKey；也支持 pushplus、bark、ntfy、telegram、企业微信、钉钉、飞书、自定义 webhook。</p>
+    <label class="field"><span>通道配置</span><textarea id="setChannels" spellcheck="false"></textarea></label>
+    <div class="btn-row">
+      <button class="btn ghost" id="btnSaveChannels">保存通道</button>
+      <button class="btn" id="btnTestPush">发送测试</button>
+    </div>
+    <p class="mini" id="pushResult" style="padding-top:8px"></p>
+
+    <div class="sec-row"><h2 class="sec">分类规则</h2>
+      <button class="act" id="btnRuleTest">试算</button>
+      <button class="act" id="btnRuleAdd">新增</button>
+    </div>
+    <p class="mini" id="rulesCaption"></p>
+    <div class="chips" id="ruleChips" style="margin-top:8px">
+      <button class="chip on" data-scope="custom">我加的</button>
+      <button class="chip" data-scope="builtin">内置</button>
+      <button class="chip" data-scope="all">全部</button>
+    </div>
+    <div class="line" style="padding-top:12px"><input type="text" id="ruleSearch" placeholder="搜关键词或分类"></div>
+    <div id="rulesList"></div>
+
+    <div class="sec-row"><h2 class="sec">维护</h2></div>
+    <p class="mini" id="serverInfo"></p>
+    <div class="btn-row" style="flex-wrap:wrap">
+      <button class="btn ghost sm" id="btnSyncNow">同步流水</button>
+      <button class="btn ghost sm" id="btnRecat">重新分类</button>
+      <button class="btn ghost sm" id="btnExport">导出 CSV</button>
+      <button class="btn ghost sm" id="btnReload">刷新数据</button>
+    </div>
+
+    <div class="sec-row"><h2 class="sec">最近导入</h2></div>
+    <div id="logImports"></div>
+    <div class="sec-row"><h2 class="sec">最近任务</h2></div>
+    <div id="logJobs"></div>
+    <div class="sec-row"><h2 class="sec">最近推送</h2></div>
+    <div id="logPushes"></div>
+  </section>
+</main>
+
+<button id="fab" aria-label="记一笔">＋</button>
+
+<nav id="tabbar">
+  <button class="on" data-view="home">总账</button>
+  <button data-view="list">流水</button>
+  <button data-view="stats">统计</button>
+  <button data-view="me">设置</button>
+</nav>
+
+<div id="mask" class="hidden"></div>
+<div id="sheet"><div class="handle"></div><div id="sheetBody"></div></div>
+<div id="toast"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

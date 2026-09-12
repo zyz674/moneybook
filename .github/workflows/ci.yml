@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: 单元测试与接口测试
+        run: python tests/test_all.py
+      - name: 全链路自检
+        run: python tools/selfcheck.py
+      - name: 语法与导入检查
+        run: |
+          python -m compileall -q src/moneybook
+          python -c "import sys; sys.path.insert(0,'src'); import moneybook.server, moneybook.jobs, moneybook.reports; print('import ok')"
