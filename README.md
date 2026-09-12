@@ -1,12 +1,29 @@
 # 记账本 · moneybook
 
+<p align="center">
+  <img src="docs/images/home.png" width="196" alt="总账">
+  <img src="docs/images/list.png" width="196" alt="流水">
+  <img src="docs/images/stats.png" width="196" alt="统计">
+  <img src="docs/images/rules.png" width="196" alt="分类规则">
+</p>
+
+<p align="center">
+  <a href="https://github.com/zyz674/moneybook/actions/workflows/ci.yml"><img src="https://github.com/zyz674/moneybook/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT">
+  <img src="https://img.shields.io/badge/python-3.9%2B-blue.svg" alt="Python 3.9+">
+  <img src="https://img.shields.io/badge/dependencies-0-brightgreen.svg" alt="零第三方依赖">
+</p>
+
 一个跑在**你自己设备**上的个人记账工具：自动收集支付宝 / 微信流水，汇总成收支明细，
-每 3 小时自动同步一次，每天定时（默认 **12:00**）生成并推送一份每日账单。
+每 3 小时自动同步一次，每天定时（默认 0 点和 12:00 两次）生成并推送一份每日账单。
 
 - 纯 Python 标准库实现，**零第三方依赖**，电脑 / 手机 Termux / 服务器都能跑
 - 数据只存在你自己的机器上（SQLite 文件），不经过任何第三方服务
 - 手机浏览器打开即用，可「添加到主屏幕」当 App 用（自带图标、深色模式）
 - 多通道抓取 + 自动去重：同一条交易从通知和官方账单两次进来也只记一笔
+
+> 手机端界面是一张「账页」：宋体做账目标题、印章做分类标记、窄体数字做金额。
+> 上面四张图分别是总账、流水、统计、分类规则。
 
 ---
 
