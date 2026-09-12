@@ -35,6 +35,17 @@ Android 通知监听（`android/` 或 MacroDroid 方案）只会把通知文本�
 - 解析失败的通知会连原文一起存进 `data/moneybook.db` 的 `pending` 表，方便你补录；
   如果不想留原文，可以在界面上处理掉，或直接删掉那些记录
 
+## 提交前自查
+
+改完代码准备 push 之前，跑一下仓库自带的检查脚本：
+
+```bash
+python tools/check_secrets.py
+```
+
+它会扫描密钥、推送 token、私钥、内网 IP、邮箱、本机路径、手机号等，
+并确认 `config.json` / `data/` 这些隐私文件确实被 gitignore 了。
+
 ## 报告问题
 
 发现安全问题时请**不要开公开 issue**，用 GitHub 的 Security → Report a vulnerability 私下告知，
