@@ -1,0 +1,14 @@
+.git
+.github
+data
+tmp
+web
+android
+__pycache__
+*.pyc
+*.db
+*.db-wal
+*.db-shm
+config.json
+*.log
+docs/images

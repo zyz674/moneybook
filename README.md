@@ -41,6 +41,17 @@
 
 ## 1. 三分钟上手
 
+### 方式 A：点链接就用（纯前端版，零安装）
+
+**<https://zyz674.github.io/moneybook/>**
+
+- 手机浏览器打开 → 右上角「导入账单」选支付宝/微信导出的 CSV → 立刻出账
+- 想当 App 用：Safari/Chrome 菜单里「添加到主屏幕」
+- **数据只存在你自己这台设备的浏览器里**（IndexedDB），不上传、不需要注册
+- 代价：没有后台自动抓取，也不会在你不开页面时推送账单 —— 要这些就用方式 B
+
+### 方式 B：自己跑服务端（全自动）
+
 **Windows**
 
 1. 双击 `run.cmd`（需要 Python 3.9+，安装时勾选 Add to PATH）
@@ -64,6 +75,20 @@ cd moneybook && ./run.sh --port 8787
 
 启动后手机浏览器访问 `http://127.0.0.1:8787`，Safari/Chrome 菜单里选「添加到主屏幕」。
 想开机自启，见 `docs/部署与使用.md`。
+
+**Docker（NAS / 服务器最省事）**
+
+```bash
+docker build -t moneybook .
+docker run -d --name moneybook -p 8787:8787 \
+  -v moneybook-data:/app/data \
+  -e MONEYBOOK_TOKEN=换成你的口令 \
+  moneybook
+```
+
+> ⚠️ 一定要挂 `-v` 数据卷。免费云平台的容器磁盘是临时的，重建就丢数据，
+> 记账数据丢不起——要么用 NAS/VPS 常驻，要么定期把 `data/moneybook.db` 备份出来。
+> 容器里也可以用 `-v /你的目录:/app/data` 直接挂到宿主机目录，方便备份。
 
 ---
 
