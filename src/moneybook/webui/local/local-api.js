@@ -94,11 +94,57 @@
         (res[3] || []).forEach(function (row) { STATE.kv[row.k] = row.v; });
         if (!STATE.rules.length) { return seedRules(); }
       }).then(function () {
+        return handleQuickHash();
+      }).then(function () {
         STATE.ready = true;
         return STATE;
       });
     }
     return readyPromise;
+  }
+
+  /** 支持用链接直接记一笔：https://.../#q=12.5 肯德基
+   *  这样 iPhone 快捷指令只要「打开 URL」一个动作就能记账。
+   *  必须在脚本加载时就把参数抓下来——界面启动时会把 hash 重置成 #home。 */
+  var QUICK_RAW = (function () {
+    var m = String(location.hash || "").match(/^#(?:q|quick)=(.+)$/);
+    if (!m) { return null; }
+    var raw = m[1];
+    try { raw = decodeURIComponent(raw.replace(/\+/g, " ")); } catch (e) { /* 已经是明文 */ }
+    try { window.history.replaceState(null, "", location.pathname + location.search + "#home"); } catch (e) { /* ignore */ }
+    return raw;
+  })();
+
+  function quickMessage(msg) {
+    try { global.dispatchEvent(new CustomEvent("mb-quick", { detail: msg })); } catch (e) { /* 老浏览器 */ }
+    global.__MB_QUICK_RESULT = msg;
+  }
+
+  function handleQuickHash() {
+    var raw = QUICK_RAW;
+    QUICK_RAW = null;
+    if (!raw) { return Promise.resolve(); }
+    var res = MB.parseNotification(raw, { loose: true });
+    if (!res.record) {
+      quickMessage("⚠️ 没识别出交易：" + res.reason + "（试试「12.5 肯德基」）");
+      return Promise.resolve();
+    }
+    var rec = res.record;
+    var rr = MB.rules.applyRules(activeRules(), rec);
+    if (rr.action === "ignore") {
+      quickMessage("这条被规则忽略，没有入账");
+      return Promise.resolve();
+    }
+    if (!rec.category) {
+      var cs = MB.rules.classify(activeRules(), rec);
+      rec.category = cs[0]; rec.sub_category = cs[1];
+    }
+    var status = addTx(rec);
+    persistRulesIfDirty();
+    quickMessage((status === "dup" || status === "merged" ? "🔁 这笔已经记过了：" : "✅ 已记账 ") +
+      "¥" + U.fmtCents(rec.amount_cents) + " · " + rec.category +
+      (rec.counterparty ? " · " + rec.counterparty : ""));
+    return Promise.resolve();
   }
 
   function seedRules() {
@@ -670,25 +716,57 @@
     if (path === "/api/import" && method === "POST") {
       var name = "upload.csv";
       try { name = decodeURIComponent((headers && headers["X-Filename"]) || "upload.csv"); } catch (e) { /* ignore */ }
-      var doParse = function (buf) {
-        var txt = U.decodeBytes(buf);
-        var parsed = MB.parseStatement(txt, name);
-        var stats = ingest(parsed.records, parsed.source, "import");
-        stats.filename = name;
-        stats.label = SOURCE_LABEL[parsed.source] || parsed.source;
-        stats.meta = parsed.meta || {};
+
+      function logImport(fname, source, stats) {
         var imports = kvGet("imports", []);
-        imports.unshift({ filename: name, source: parsed.source, rows_new: stats["new"], rows_dup: stats.dup + stats.merged,
-                          imported_at: U.nowStr() });
+        imports.unshift({ filename: fname, source: source, rows_new: stats["new"],
+                          rows_dup: (stats.dup || 0) + (stats.merged || 0), imported_at: U.nowStr() });
         kvSet("imports", imports.slice(0, 30));
         kvSet("last_import_at", U.nowStr());
+      }
+
+      function parseOne(txt, fname) {
+        var parsed = MB.parseStatement(txt, fname);
+        var stats = ingest(parsed.records, parsed.source, "import");
+        stats.filename = fname;
+        stats.label = SOURCE_LABEL[parsed.source] || parsed.source;
+        stats.meta = parsed.meta || {};
+        return stats;
+      }
+
+      function handleBuffer(buf) {
+        var bytes = new Uint8Array(buf);
+        if (MB.isZip(bytes)) {                       // 支付宝/微信导出的都是 zip
+          return MB.readZip(bytes).then(function (res) {
+            if (!res.files.length) {
+              return fail("这个 zip 里没有 CSV 账单。" +
+                (res.skipped.length ? "跳过了：" + res.skipped.join("、") +
+                 "。带密码的 zip 请先在 iPhone「文件」App 里长按解压（会提示输密码），再选解压出来的 CSV。" : ""));
+            }
+            var sum = { source: "", total: 0, "new": 0, dup: 0, merged: 0, neutral: 0, ignored: 0, files: [] };
+            res.files.forEach(function (f2) {
+              var st = parseOne(f2.text, f2.name);
+              ["total", "new", "dup", "merged", "neutral", "ignored"].forEach(function (k) { sum[k] += st[k] || 0; });
+              if (!sum.source) { sum.source = st.source; }
+              sum.files.push({ name: f2.name, total: st.total, isnew: st["new"] });
+            });
+            sum.label = SOURCE_LABEL[sum.source] || sum.source;
+            sum.from_zip = true;
+            sum.skipped = res.skipped;
+            logImport(name, sum.source, sum);
+            return json({ ok: true, stats: sum });
+          }).catch(function (e) { return fail("解压失败：" + e.message); });
+        }
+        var stats = parseOne(U.decodeBytes(bytes), name);
+        logImport(name, stats.source, stats);
         return json({ ok: true, stats: stats });
-      };
+      }
+
       if (rawBody && rawBody.arrayBuffer) {
-        return rawBody.arrayBuffer().then(function (buf) { return doParse(buf); });
+        return rawBody.arrayBuffer().then(handleBuffer);
       }
       var textBody = body && (body.text || body._raw);
-      if (textBody) { return doParse(new TextEncoder().encode(textBody)); }
+      if (textBody) { return handleBuffer(new TextEncoder().encode(textBody).buffer); }
       return fail("没有收到文件内容");
     }
 
@@ -995,4 +1073,10 @@
 
   setInterval(checkDaily, 60000);
   ready().then(function () { setTimeout(checkDaily, 3000); });
+  global.MB.quick = function (text) {
+    return ready().then(function () {
+      location.hash = "q=" + encodeURIComponent(text);
+      return handleQuickHash();
+    });
+  };
 })(window);

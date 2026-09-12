@@ -413,7 +413,9 @@
         $("#importResult").textContent = "没读出流水。确认文件是支付宝或微信「用于个人对账」导出的 CSV，不是截图或 PDF。";
       } else {
         $("#importResult").textContent = "导入完成：" + (s.label || s.source) + " 共 " + s.total + " 条，" +
-          "新增 " + s.new + " 条，去重 " + ((s.dup || 0) + (s.merged || 0)) + " 条。";
+          "新增 " + s.new + " 条，去重 " + ((s.dup || 0) + (s.merged || 0)) + " 条。" +
+          (s.from_zip && s.files && s.files.length > 1 ? "（来自 zip 里的 " + s.files.length + " 个文件）" : "") +
+          (s.skipped && s.skipped.length ? " 跳过：" + s.skipped.join("、") : "");
         toast("新增 " + s.new + " 条流水");
       }
       loadHome(); loadList(); loadMe();
@@ -891,6 +893,15 @@
     started = true;
     bind();
     boot();
+    // 纯前端版支持「打开链接就记一笔」（#q=12.5 肯德基），结果用事件回传
+    window.addEventListener("mb-quick", function (e) {
+      toast(e.detail, 4200);
+      loadHome();
+    });
+    if (window.__MB_QUICK_RESULT) {          // 万一事件比监听器先到
+      toast(window.__MB_QUICK_RESULT, 4200);
+      window.__MB_QUICK_RESULT = null;
+    }
     // 浏览器前进/后退、书签、手改地址栏里的 #视图 都要能切过去
     window.addEventListener("hashchange", function () {
       var v = (window.location.hash || "").replace("#", "");

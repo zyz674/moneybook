@@ -225,6 +225,80 @@
     return "bank";
   }
 
+  /* ---------------- ZIP 解析（支付宝/微信导出的都是 zip） ---------------- */
+
+  function isZip(buf) {
+    var b = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+    return b.length > 4 && b[0] === 0x50 && b[1] === 0x4b && (b[2] === 0x03 || b[2] === 0x05 || b[2] === 0x07);
+  }
+
+  function unzipEntries(buf) {
+    var bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+    var view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    var eocd = -1;
+    for (var i = bytes.length - 22; i >= 0 && i >= bytes.length - 66000; i--) {
+      if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) { return null; }
+    var count = view.getUint16(eocd + 10, true);
+    var p = view.getUint32(eocd + 16, true);
+    var entries = [];
+    for (var n = 0; n < count; n++) {
+      if (p + 46 > bytes.length || view.getUint32(p, true) !== 0x02014b50) { break; }
+      var flags = view.getUint16(p + 8, true);
+      var method = view.getUint16(p + 10, true);
+      var compSize = view.getUint32(p + 20, true);
+      var nameLen = view.getUint16(p + 28, true);
+      var extraLen = view.getUint16(p + 30, true);
+      var commentLen = view.getUint16(p + 32, true);
+      var localOffset = view.getUint32(p + 42, true);
+      var name = new TextDecoder("utf-8").decode(bytes.subarray(p + 46, p + 46 + nameLen));
+      p += 46 + nameLen + extraLen + commentLen;
+      if (/\/$/.test(name) || !/\.(csv|txt)$/i.test(name)) { continue; }   // 只关心账单文件
+      if (flags & 0x1) { entries.push({ name: name, encrypted: true }); continue; }
+      var lnameLen = view.getUint16(localOffset + 26, true);
+      var lextraLen = view.getUint16(localOffset + 28, true);
+      var start = localOffset + 30 + lnameLen + lextraLen;
+      var data = bytes.subarray(start, start + compSize);
+      if (method === 0) { entries.push({ name: name, bytes: data }); }
+      else if (method === 8) { entries.push({ name: name, deflateRaw: data }); }
+      else { entries.push({ name: name, error: "压缩方式 " + method + " 不支持" }); }
+    }
+    return entries;
+  }
+
+  function inflateRaw(data) {
+    if (typeof DecompressionStream === "undefined") {
+      return Promise.reject(new Error("这个浏览器不支持解压 zip，请先用「文件」App 解压后选 CSV"));
+    }
+    try {
+      var ds = new DecompressionStream("deflate-raw");
+      var stream = new Blob([data]).stream().pipeThrough(ds);
+      return new Response(stream).arrayBuffer().then(function (buf) { return new Uint8Array(buf); });
+    } catch (e) {
+      return Promise.reject(new Error("解压失败：" + e.message));
+    }
+  }
+
+  /** 把 zip 里的账单文件逐一解出来，返回 [{name, text}] */
+  function readZip(buf) {
+    var entries = unzipEntries(buf);
+    if (!entries) { return Promise.reject(new Error("这不是一个有效的 zip 文件")); }
+    var out = [], skipped = [];
+    var chain = Promise.resolve();
+    entries.forEach(function (e) {
+      chain = chain.then(function () {
+        if (e.encrypted) { skipped.push(e.name + "（有密码）"); return; }
+        if (e.error) { skipped.push(e.name + "（" + e.error + "）"); return; }
+        if (e.bytes) { out.push({ name: e.name, text: decodeBytes(e.bytes) }); return; }
+        return inflateRaw(e.deflateRaw).then(function (raw) {
+          out.push({ name: e.name, text: decodeBytes(raw) });
+        });
+      });
+    });
+    return chain.then(function () { return { files: out, skipped: skipped }; });
+  }
+
   function parseStatement(text, filename) {
     var source = detectSource(text, filename);
     var sample = text.split("\n").slice(0, 40).join("\n");
@@ -515,6 +589,8 @@
               parseDateTimeLoose: parseDateTimeLoose, dateRange: dateRange, monthDays: monthDays,
               decodeBytes: decodeBytes };
   MB.parseStatement = parseStatement;
+  MB.isZip = isZip;
+  MB.readZip = readZip;
   MB.parseNotification = parseNotification;
   MB.rules = { evaluate: evaluate, applyRules: applyRules, classify: classify,
                shouldNeutralize: shouldNeutralize, ruleMatches: ruleMatches,
