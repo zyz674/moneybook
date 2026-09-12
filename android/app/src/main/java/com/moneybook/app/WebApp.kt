@@ -3,6 +3,7 @@ package com.moneybook.app
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -18,7 +19,13 @@ object WebApp {
     const val START_URL = "https://appassets.androidplatform.net/assets/www/index.html"
 
     @SuppressLint("SetJavaScriptEnabled")
-    fun create(context: Context, bridge: Any, bridgeName: String): WebView {
+    fun create(
+        context: Context,
+        bridge: Any,
+        bridgeName: String,
+        chromeClient: WebChromeClient? = null,
+        onPageFinished: ((WebView, String) -> Unit)? = null
+    ): WebView {
         val web = WebView(context)
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
@@ -46,7 +53,17 @@ object WebApp {
                 }
                 return true
             }
+
+            override fun onPageFinished(view: WebView, url: String) {
+                onPageFinished?.invoke(view, url)
+            }
         }
+
+        // 没有它，网页里的 <input type="file"> 点了不会有任何反应
+        if (chromeClient != null) {
+            web.webChromeClient = chromeClient
+        }
+
         web.addJavascriptInterface(bridge, bridgeName)
         return web
     }

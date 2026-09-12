@@ -625,6 +625,76 @@
     return stats;
   }
 
+  /** 统一的导入实现：文件字节 -> 解析 -> 分类 -> 入库。返回 {ok, stats|error} */
+  function importBuffer(buf, name) {
+    function logImport(fname, source, stats) {
+      var imports = kvGet("imports", []);
+      imports.unshift({ filename: fname, source: source, rows_new: stats["new"],
+                        rows_dup: (stats.dup || 0) + (stats.merged || 0), imported_at: U.nowStr() });
+      kvSet("imports", imports.slice(0, 30));
+      kvSet("last_import_at", U.nowStr());
+    }
+    function parseOne(txt, fname) {
+      var parsed = MB.parseStatement(txt, fname);
+      var stats = ingest(parsed.records, parsed.source, "import");
+      stats.filename = fname;
+      stats.label = SOURCE_LABEL[parsed.source] || parsed.source;
+      stats.meta = parsed.meta || {};
+      return stats;
+    }
+    var bytes = new Uint8Array(buf);
+    if (MB.isZip(bytes)) {                       // 支付宝/微信导出的都是 zip
+      return MB.readZip(bytes).then(function (res) {
+        if (!res.files.length) {
+          return { ok: false, error: "这个 zip 里没有 CSV 账单。" +
+            (res.skipped.length ? "跳过了：" + res.skipped.join("、") +
+             "。带密码的 zip 请先在「文件」App 里长按解压（会提示输密码），再选解压出来的 CSV。" : "") };
+        }
+        var sum = { source: "", total: 0, "new": 0, dup: 0, merged: 0, neutral: 0, ignored: 0, files: [] };
+        res.files.forEach(function (f2) {
+          var st = parseOne(f2.text, f2.name);
+          ["total", "new", "dup", "merged", "neutral", "ignored"].forEach(function (k) { sum[k] += st[k] || 0; });
+          if (!sum.source) { sum.source = st.source; }
+          sum.files.push({ name: f2.name, total: st.total, isnew: st["new"] });
+        });
+        sum.label = SOURCE_LABEL[sum.source] || sum.source;
+        sum.from_zip = true;
+        sum.skipped = res.skipped;
+        logImport(name, sum.source, sum);
+        return { ok: true, stats: sum };
+      }).catch(function (e) {
+        return { ok: false, error: "解压失败：" + e.message };
+      });
+    }
+    var stats = parseOne(U.decodeBytes(bytes), name);
+    logImport(name, stats.source, stats);
+    return Promise.resolve({ ok: true, stats: stats });
+  }
+
+  /** 安卓 App：从文件选择器/分享进来的文件（base64）直接导入 */
+  global.MB.importBase64 = function (name, b64) {
+    return ready().then(function () {
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) { bytes[i] = bin.charCodeAt(i); }
+      return importBuffer(bytes.buffer, name || "账单.csv");
+    }).then(function (res) {
+      if (!res.ok) {
+        quickMessage("⚠️ 导入失败：" + res.error);
+        return res;
+      }
+      var s = res.stats;
+      quickMessage("✅ 导入完成：" + (s.label || s.source) + " 共 " + s.total + " 条，新增 " + s["new"] +
+        " 条，去重 " + ((s.dup || 0) + (s.merged || 0)) + " 条" +
+        (s.skipped && s.skipped.length ? "（跳过 " + s.skipped.join("、") + "）" : ""));
+      nativeNotify("账单导入完成", (s.label || s.source) + " 共 " + s.total + " 条，新增 " + s["new"] + " 条");
+      return res;
+    }).catch(function (e) {
+      quickMessage("⚠️ 导入失败：" + e.message);
+      return { ok: false, error: e.message };
+    });
+  };
+
   function persistRulesIfDirty() {
     if (!MB.dirty.rules) { return; }
     MB.dirty.rules = false;
@@ -794,58 +864,19 @@
     if (path === "/api/import" && method === "POST") {
       var name = "upload.csv";
       try { name = decodeURIComponent((headers && headers["X-Filename"]) || "upload.csv"); } catch (e) { /* ignore */ }
-
-      function logImport(fname, source, stats) {
-        var imports = kvGet("imports", []);
-        imports.unshift({ filename: fname, source: source, rows_new: stats["new"],
-                          rows_dup: (stats.dup || 0) + (stats.merged || 0), imported_at: U.nowStr() });
-        kvSet("imports", imports.slice(0, 30));
-        kvSet("last_import_at", U.nowStr());
-      }
-
-      function parseOne(txt, fname) {
-        var parsed = MB.parseStatement(txt, fname);
-        var stats = ingest(parsed.records, parsed.source, "import");
-        stats.filename = fname;
-        stats.label = SOURCE_LABEL[parsed.source] || parsed.source;
-        stats.meta = parsed.meta || {};
-        return stats;
-      }
-
-      function handleBuffer(buf) {
-        var bytes = new Uint8Array(buf);
-        if (MB.isZip(bytes)) {                       // 支付宝/微信导出的都是 zip
-          return MB.readZip(bytes).then(function (res) {
-            if (!res.files.length) {
-              return fail("这个 zip 里没有 CSV 账单。" +
-                (res.skipped.length ? "跳过了：" + res.skipped.join("、") +
-                 "。带密码的 zip 请先在 iPhone「文件」App 里长按解压（会提示输密码），再选解压出来的 CSV。" : ""));
-            }
-            var sum = { source: "", total: 0, "new": 0, dup: 0, merged: 0, neutral: 0, ignored: 0, files: [] };
-            res.files.forEach(function (f2) {
-              var st = parseOne(f2.text, f2.name);
-              ["total", "new", "dup", "merged", "neutral", "ignored"].forEach(function (k) { sum[k] += st[k] || 0; });
-              if (!sum.source) { sum.source = st.source; }
-              sum.files.push({ name: f2.name, total: st.total, isnew: st["new"] });
-            });
-            sum.label = SOURCE_LABEL[sum.source] || sum.source;
-            sum.from_zip = true;
-            sum.skipped = res.skipped;
-            logImport(name, sum.source, sum);
-            return json({ ok: true, stats: sum });
-          }).catch(function (e) { return fail("解压失败：" + e.message); });
-        }
-        var stats = parseOne(U.decodeBytes(bytes), name);
-        logImport(name, stats.source, stats);
-        return json({ ok: true, stats: stats });
-      }
-
+      var payload;
       if (rawBody && rawBody.arrayBuffer) {
-        return rawBody.arrayBuffer().then(handleBuffer);
+        payload = rawBody.arrayBuffer();
+      } else {
+        var textBody = body && (body.text || body._raw);
+        if (!textBody) { return fail("没有收到文件内容"); }
+        payload = Promise.resolve(new TextEncoder().encode(textBody).buffer);
       }
-      var textBody = body && (body.text || body._raw);
-      if (textBody) { return handleBuffer(new TextEncoder().encode(textBody).buffer); }
-      return fail("没有收到文件内容");
+      return payload.then(function (buf) {
+        return importBuffer(buf, name);
+      }).then(function (res) {
+        return res.ok ? json({ ok: true, stats: res.stats }) : fail(res.error);
+      });
     }
 
     if (path === "/api/tx" && method === "POST") {
