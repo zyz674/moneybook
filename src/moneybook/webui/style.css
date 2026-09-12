@@ -42,6 +42,7 @@ h1, h2, h3, p, dl, dd, dt, figure { margin: 0; }
 button, input, select, textarea { font-family: inherit; font-size: 15px; color: inherit; }
 button { cursor: pointer; }
 .hidden { display: none !important; }
+html.local .server-only { display: none !important; }   /* 纯前端版没有服务端项 */
 :focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 2px; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 1px; }
 .num { font-family: var(--fig); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }

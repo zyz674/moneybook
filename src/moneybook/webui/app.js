@@ -4,6 +4,7 @@
 (function () {
   "use strict";
 
+  var LOCAL = !!window.MONEYBOOK_LOCAL;     // 纯前端版（GitHub Pages）：没有服务端
   var TOKEN_KEY = "mb_token";
   var CATS = ["餐饮", "交通", "购物", "日用百货", "居住", "通讯", "娱乐", "医疗健康",
               "教育学习", "人情往来", "金融", "收入", "其他", "未分类"];
@@ -126,8 +127,11 @@
   }
   function renderRows(items, group) {
     if (!items || !items.length) {
-      return emptyBox("这段时间没有流水。", "把支付宝或微信导出的账单放进 <code>data/inbox</code>，" +
-        "或在设置里直接上传，点「同步流水」就会自动导入。也可以点右下角「＋」自己记一笔。");
+      return emptyBox("这段时间没有流水。", LOCAL
+        ? "点右上角「导入账单」，选支付宝或微信导出的 CSV（在「我的 → 数据导入」里也能上传）。" +
+          "也可以点右下角「＋」自己记一笔。"
+        : "把支付宝或微信导出的账单放进 <code>data/inbox</code>，" +
+          "或在设置里直接上传，点「同步流水」就会自动导入。也可以点右下角「＋」自己记一笔。");
     }
     if (!group) { return '<div class="rows">' + items.map(txRow).join("") + "</div>"; }
     var out = [], lastDay = null, dayOut = 0, buf = [];
@@ -217,9 +221,12 @@
       }
 
       var sch = d.scheduler || {};
-      $("#syncLine").textContent = "上次同步 " + (d.last_sync ? d.last_sync.slice(5, 16) : "还没同步过") +
-        "，每 " + sch.interval_hours + " 小时自动同步一次（下次 " + String(sch.next_sync || "-").slice(5) +
-        "），下次账单 " + String(sch.next_daily_report || "-").slice(5) + "。";
+      $("#syncLine").textContent = LOCAL
+        ? ("上次导入 " + (d.last_sync ? d.last_sync.slice(5, 16) : "还没导入过") +
+           "　数据存在这台设备的浏览器里，下次账单 " + String(sch.next_daily_report || "-").slice(5) + "。")
+        : ("上次同步 " + (d.last_sync ? d.last_sync.slice(5, 16) : "还没同步过") +
+           "，每 " + sch.interval_hours + " 小时自动同步一次（下次 " + String(sch.next_sync || "-").slice(5) +
+           "），下次账单 " + String(sch.next_daily_report || "-").slice(5) + "。");
 
       var pending = d.counts.pending || 0;
       $("#pendingLine").classList.toggle("hidden", !pending);
@@ -363,8 +370,10 @@
       $("#setBudget").value = ((s.budget || {}).monthly || 0);
       $("#setLarge").value = ((s.alerts || {}).large_amount || 0);
       $("#setChannels").value = JSON.stringify(((s.notify || {}).channels) || [], null, 2);
-      $("#serverInfo").textContent = "数据库 " + d.paths.db + "。访问口令" +
-        (d.token_set ? "已开启。" : "没开——同一个 WiFi 下的其他人都能打开，建议在 config.json 里设一个 access_token。");
+      $("#serverInfo").textContent = LOCAL
+        ? ("数据保存在 " + d.paths.db + "，不会上传到任何服务器。换设备或清浏览器数据前，记得先「导出 CSV」备份。")
+        : ("数据库 " + d.paths.db + "。访问口令" +
+           (d.token_set ? "已开启。" : "没开——同一个 WiFi 下的其他人都能打开，建议在 config.json 里设一个 access_token。"));
     }).then(function () {
       return Promise.all([api("/api/imports"), api("/api/jobs"), api("/api/pushes")]);
     }).then(function (res) {
@@ -722,7 +731,12 @@
     $("#fab").onclick = openAddSheet;
     $("#mask").onclick = closeSheet;
 
-    $("#btnSync").onclick = function () {
+    if (LOCAL) {
+      $("#btnSync").textContent = "导入账单";
+      $("#btnSync").onclick = function () { $("#fileInput").click(); };
+      document.documentElement.classList.add("local");
+    }
+    $("#btnSync").onclick = LOCAL ? $("#btnSync").onclick : function () {
       var btn = this;
       btn.textContent = "同步中…";
       api("/api/sync", { json: {} }).then(function (r) {
