@@ -11,5 +11,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "moneybook-relay"
+rootProject.name = "moneybook"
 include(":app")

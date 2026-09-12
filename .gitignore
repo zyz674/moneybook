@@ -3,6 +3,13 @@ data/
 
 # 纯前端版的构建产物（由 tools/build_pages.py 生成，CI 里自动构建）
 web/
+android/app/src/main/assets/www/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+*.keystore
 tmp/
 config.json
 *.db

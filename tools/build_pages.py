@@ -75,6 +75,14 @@ def main():
     mf["icons"] = [dict(i, src=i["src"].lstrip("/")) for i in mf.get("icons", [])]
     json.dump(mf, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
+    # 同步一份到安卓工程（WebView 直接读 assets）
+    android_assets = os.path.join(ROOT, "android", "app", "src", "main", "assets", "www")
+    if "--no-android" not in sys.argv:
+        if os.path.isdir(android_assets):
+            shutil.rmtree(android_assets)
+        shutil.copytree(OUT, android_assets)
+        print("已同步到安卓工程：android/app/src/main/assets/www")
+
     total = sum(os.path.getsize(os.path.join(OUT, f)) for f in os.listdir(OUT))
     print("web/ 构建完成：%d 个文件，%.0f KB" % (len(os.listdir(OUT)), total / 1024.0))
     for name in sorted(os.listdir(OUT)):

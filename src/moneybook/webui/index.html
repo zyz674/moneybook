@@ -127,6 +127,12 @@
     <label class="field"><span>选择账单文件</span><input type="file" id="fileInput" accept=".csv,.txt,.zip"></label>
     <p class="mini" id="importResult"></p>
 
+    <div id="nativeBox" class="hidden">
+      <div class="sec-row"><h2 class="sec">手机 App</h2></div>
+      <p class="mini" id="nativeText"></p>
+      <div class="btn-row"><button class="btn ghost" id="btnNativeAccess">开启通知读取权限</button></div>
+    </div>
+
     <div class="sec-row"><h2 class="sec">自动同步与账单</h2></div>
     <label class="field server-only"><span>账单投递目录<em>（把导出的账单复制进来就会自动导入）</em></span>
       <input type="text" id="setInbox" readonly></label>

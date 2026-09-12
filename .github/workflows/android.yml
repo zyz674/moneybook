@@ -1,0 +1,60 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - "src/moneybook/webui/**"
+      - "tools/build_pages.py"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 构建网页资源（安卓 App 直接内置这一份）
+        run: python tools/build_pages.py
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: 生成启动图标
+        run: python tools/make_android_icons.py
+
+      - name: 编译 APK
+        run: gradle -p android assembleDebug --no-daemon --stacktrace
+
+      - name: 重命名产物
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/moneybook.apk
+          ls -lh dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moneybook-apk
+          path: dist/moneybook.apk
+          if-no-files-found: error
+
+      - name: 打 tag 时顺便发一个 Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/moneybook.apk

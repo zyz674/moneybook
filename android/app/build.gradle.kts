@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.moneybook.relay"
+    namespace = "com.moneybook.app"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.moneybook.relay"
+        applicationId = "com.moneybook.app"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
@@ -18,8 +18,11 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // 用 debug 签名，方便把 APK 直接发给朋友安装；要正式发布再换成自己的 keystore
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -27,8 +30,12 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    packaging {
+        resources.excludes += setOf("META-INF/*.kotlin_module")
+    }
 }
 
 dependencies {
-    // 不需要任何第三方依赖：HTTP 用 HttpURLConnection，JSON 用系统自带的 org.json
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.webkit:webkit:1.11.0")
 }

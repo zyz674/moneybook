@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">记账本转发</string>
-    <string name="service_label">记账本通知转发</string>
+    <string name="app_name">记账本</string>
+    <string name="channel_running">后台记录</string>
+    <string name="channel_bill">每日账单</string>
+    <string name="running_title">记账本正在记录流水</string>
+    <string name="running_text">数据只保存在这台手机上，不会上传</string>
 </resources>

@@ -115,6 +115,84 @@
     return raw;
   })();
 
+  /** 安卓 App 里有没有原生桥（有的话就能弹系统通知） */
+  function nativeNotify(title, body) {
+    try {
+      if (global.MoneybookNative && global.MoneybookNative.notify) {
+        global.MoneybookNative.notify(title, body);
+        return true;
+      }
+    } catch (e) { /* 不在 App 里 */ }
+    return false;
+  }
+
+  function extractAmountGuess(text) {
+    var m = String(text || "").match(/[¥￥]\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/);
+    if (!m) { m = String(text || "").match(/([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*元/); }
+    return m ? Math.abs(U.parseCents(m[1]) || 0) : null;
+  }
+
+  function addPending(raw, source, pkg, reason, amount) {
+    var sig = U.hash(U.normText(String(raw).slice(0, 160)));
+    for (var i = 0; i < STATE.pending.length; i++) {
+      var p = STATE.pending[i];
+      if (p.sig === sig) {
+        p.attempts = (p.attempts || 1) + 1;
+        p.status = "open";
+        p.reason = reason;
+        put("pending", p);
+        return p.id;
+      }
+    }
+    var row = {
+      id: nextId("pending"), sig: sig, raw: String(raw).slice(0, 800), source: source || "",
+      package: pkg || "", device: "android-app", ts: U.nowStr(), reason: reason,
+      amount_cents: amount, status: "open", tx_id: null, attempts: 1,
+      created_at: U.nowStr(), updated_at: U.nowStr()
+    };
+    STATE.pending.push(row);
+    put("pending", row);
+    return row.id;
+  }
+
+  /** 安卓 App 把通知队列喂进来：解析 -> 分类 -> 入库，认不出来的进「待录入」 */
+  global.MB.ingestQueue = function (items) {
+    if (!items || !items.length) { return 0; }
+    var rules = activeRules();
+    var saved = [];
+    items.forEach(function (it) {
+      var text = String((it && it.text) || "");
+      var pkg = String((it && it.pkg) || "");
+      var ts = (it && it.ts) ? U.fmtTs(new Date(Number(it.ts))) : U.nowStr();
+      var parsed = MB.parseNotification(text, { package: pkg, ts: ts });
+      if (!parsed.record) {
+        addPending(text, "", pkg, parsed.reason, extractAmountGuess(text));
+        return;
+      }
+      var rec = parsed.record;
+      rec.origin = "notify";
+      if (rec.direction !== "neutral" && MB.rules.shouldNeutralize(rec)) { rec.direction = "neutral"; }
+      var rr = MB.rules.applyRules(rules, rec);
+      if (rr.action === "ignore") { return; }
+      if (!rec.category) {
+        var cs = MB.rules.classify(rules, rec);
+        rec.category = cs[0]; rec.sub_category = cs[1];
+      }
+      if (addTx(rec) === "new") { saved.push(rec); }
+    });
+    persistRulesIfDirty();
+    if (saved.length) {
+      var lines = saved.slice(0, 4).map(function (r) {
+        return (r.direction === "in" ? "+" : "−") + "¥" + U.fmtCents(r.amount_cents) + " " +
+               (r.counterparty || r.item || r.category || "");
+      });
+      var mon = monthStatus(U.monthOf(U.nowStr()));
+      nativeNotify("已记 " + saved.length + " 笔",
+        lines.join("\n") + "\n本月支出 ¥" + U.fmtCents(mon.out_cents));
+    }
+    return saved.length;
+  };
+
   function quickMessage(msg) {
     try { global.dispatchEvent(new CustomEvent("mb-quick", { detail: msg })); } catch (e) { /* 老浏览器 */ }
     global.__MB_QUICK_RESULT = msg;
@@ -1016,9 +1094,11 @@
       var bodyText = renderReport(rep);
       kvSet("last_report_ts", rep.end);
       kvSet("last_report_text", bodyText);
-      pushAll("账单 " + rep.label + " · 支出¥" + fmt(rep.out_cents), bodyText);
-      if (global.Notification && Notification.permission === "granted") {
-        try { new Notification("账单 · 支出 ¥" + fmt(rep.out_cents), { body: bodyText.slice(0, 120) }); } catch (e) { /* ignore */ }
+      var title = "账单 · 支出 ¥" + fmt(rep.out_cents);
+      pushAll(title, bodyText);
+      nativeNotify(title, bodyText);
+      if (global.Notification && Notification.permission === "granted" && !global.MoneybookNative) {
+        try { new Notification(title, { body: bodyText.slice(0, 120) }); } catch (e) { /* ignore */ }
       }
     });
   }
@@ -1071,8 +1151,15 @@
     return nativeOpen.apply(global, arguments);
   };
 
-  setInterval(checkDaily, 60000);
-  ready().then(function () { setTimeout(checkDaily, 3000); });
+  // 后台模式（安卓 App 的常驻服务用 ?bg=1 打开）才负责定时账单，
+  // 这样 App 界面和后台服务不会各弹一次
+  var IS_BG = /[?&]bg=1/.test(location.search);
+  global.MB.checkDaily = checkDaily;
+  global.MB.isBackground = IS_BG;
+  if (IS_BG) {
+    setInterval(checkDaily, 60000);
+    ready().then(function () { setTimeout(checkDaily, 3000); });
+  }
   global.MB.quick = function (text) {
     return ready().then(function () {
       location.hash = "q=" + encodeURIComponent(text);

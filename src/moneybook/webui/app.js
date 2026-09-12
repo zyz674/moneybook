@@ -902,6 +902,22 @@
       toast(window.__MB_QUICK_RESULT, 4200);
       window.__MB_QUICK_RESULT = null;
     }
+    if (window.MoneybookNative) {            // 跑在安卓 App 里
+      var box = $("#nativeBox");
+      if (box) {
+        box.classList.remove("hidden");
+        var granted = false;
+        try { granted = !!window.MoneybookNative.hasNotificationAccess(); } catch (e) { /* 老版本 */ }
+        $("#nativeText").textContent = granted
+          ? "通知读取已开启。微信、支付宝、银行的付款通知会自动记账；每天定点也会在手机上弹出当日账单。" +
+            "数据全部保存在这台手机里，不上传。"
+          : "还差一步：开启「通知读取权限」，付款通知就会自动记下来——不需要电脑、不需要服务器。";
+        $("#btnNativeAccess").textContent = granted ? "查看权限设置" : "开启通知读取权限";
+        $("#btnNativeAccess").onclick = function () {
+          try { window.MoneybookNative.openNotificationSettings(); } catch (e) { toast("请到系统设置 → 通知 → 通知使用权 里开启"); }
+        };
+      }
+    }
     // 浏览器前进/后退、书签、手改地址栏里的 #视图 都要能切过去
     window.addEventListener("hashchange", function () {
       var v = (window.location.hash || "").replace("#", "");
